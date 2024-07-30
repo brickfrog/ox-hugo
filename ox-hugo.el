@@ -1592,6 +1592,28 @@ INFO is a plist used as a communication channel."
                   (setf (car found-key-cell) key-repl))))))))
     data))
 
+;; ;; PRIORITY keywords
+(defun org-hugo--priority (priority info)
+  "Format PRIORITY into HTML.
+This function creates a span element for the priority with appropriate classes.
+It handles standard priorities (A, B, C) as well as numeric and non-standard priorities.
+INFO is a plist used as a communication channel."
+  (when priority
+    ;; (message "[DBG priority] priority: %S" priority)
+    ;; (message "[DBG priority] info: %S" info)
+    (let* ((priority-char (if (string-match "\\[#\\(.\\)\\]" priority)
+                              (match-string 1 priority)
+                            "X"))  ; Default to 'X' if format is unexpected
+           (priority-class (format "priority-%s"
+                                   (if (string-match-p "[A-Za-z0-9]" priority-char)
+                                       priority-char
+                                     "other"))))  ; Use 'other' for non-alphanumeric priorities
+      ;; (message "[DBG priority] priority-char: %S" priority-char)
+      ;; (message "[DBG priority] priority-class: %S" priority-class)
+      (format "<span class=\"org-priority %s\">%s</span>"
+              priority-class
+              (org-html-encode-plain-text priority)))))
+
 ;;;; TODO keywords
 (defun org-hugo--todo (todo info)
   "Format TODO keywords into HTML.
@@ -2116,7 +2138,7 @@ a communication channel."
            (priority
             (and (org-hugo--plist-get-true-p info :with-priority)
                  (let ((char (org-element-property :priority heading)))
-                   (and char (format "[#%c] " char)))))
+                   (and char (org-hugo--priority (format "[#%c]" char) info)))))
            (style (plist-get info :md-headline-style)))
       ;; (message "[ox-hugo-heading DBG] num: %s" numbers)
       ;; (message "[ox-hugo-heading DBG] with-tags: %S" (org-hugo--plist-get-true-p info :with-tags))
@@ -2144,7 +2166,7 @@ a communication channel."
        (t
         (let* ((anchor (format "{#%s}" (org-hugo--get-anchor heading info))) ;https://gohugo.io/extras/crossreferences/
                (heading-title (org-hugo--heading-title style level loffset title
-                                                       todo-fmtd tags-fmtd anchor numbers))
+                                                       todo-fmtd tags-fmtd anchor numbers priority))
                (wrap-element (org-hugo--container heading info))
                (content-str (or (org-string-nw-p contents) "")))
           (if wrap-element
@@ -2453,7 +2475,7 @@ Return an empty string if all functions in
        org-hugo-anchor-functions)
       ""))
 
-(defun org-hugo--heading-title (style level loffset title &optional todo tags anchor numbers)
+(defun org-hugo--heading-title (style level loffset title &optional todo tags anchor numbers priority)
   "Generate a heading title in the preferred Markdown heading style.
 
 STYLE is the preferred style (`atx' or `setext').
@@ -2472,7 +2494,7 @@ string.
 
 Optional argument NUMBERS, if non-nil, is an htmlized string
 containing the TITLE's number."
-  (let ((heading (concat todo numbers title tags " " anchor "\n")))
+  (let ((heading (concat priority todo numbers title tags " " anchor "\n")))
     ;; Use "Setext" style
     (if (and (eq style 'setext) (< level 3))
         (let* ((underline-char (if (= level 1) ?= ?-))
